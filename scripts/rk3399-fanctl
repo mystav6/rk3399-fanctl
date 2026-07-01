@@ -72,17 +72,32 @@ cmd_levels() {
     log_info "Nastavuji cooling-levels: $new_levels"
     log_info "Cílový DTB: $dtb_path"
 
-    dtb_write_cooling_levels "$dtb_path" "$new_levels" || exit "$EXIT_DTC_FAILED"
-    dtb_verify "$dtb_path" "$new_levels"               || exit "$EXIT_VERIFY_FAILED"
+    dtb_write_cooling_levels "$dtb_path" "$new_levels"
+    write_rc=$?
 
-    # Uložíme stav pro kernel hook (pokud --no-state-update není nastaven)
+    if [ "$write_rc" -eq 2 ]; then
+        # Nothing to do - hodnoty jsou stejné, jen uložíme stav
+        if [ "$NO_STATE_UPDATE" -eq 0 ]; then
+            dtb_state_save "$new_levels" "$dtb_path"
+        fi
+        printf '\n'
+        log_ok "Cooling-levels $new_levels jsou již nastaveny."
+        log_info "Stav uložen pro případ aktualizace kernelu."
+        return 0
+    fi
+
+    [ "$write_rc" -eq 0 ] || exit "$EXIT_DTC_FAILED"
+
+    dtb_verify "$dtb_path" "$new_levels" || exit "$EXIT_VERIFY_FAILED"
+
+    # Uložíme stav pro kernel hook
     if [ "$NO_STATE_UPDATE" -eq 0 ]; then
         dtb_state_save "$new_levels" "$dtb_path"
     fi
 
     printf '\n'
-    log_ok "Hotovo. Změny jsou okamžitě aktivní."
-    log_info "Po aktualizaci kernelu budou cooling-levels automaticky znovu aplikovány."
+    log_ok "Hotovo. Nové cooling-levels jsou okamžitě aktivní."
+    log_info "Po aktualizaci kernelu budou automaticky znovu aplikovány."
 }
 
 cmd_min_pwm() {
@@ -97,12 +112,15 @@ cmd_min_pwm() {
 
     log_debug "Aktuální levels: $current"
 
-    # Nahradíme druhou hodnotu (minimální PWM) - první je vždy 0
-    new_levels=$(printf '%s' "$current" | awk -F, -v m="$min_pwm" '{
-        $2 = m; OFS=","; print $1,$2,$3,$4
-    }')
+    # Varianta B: nahradí min PWM a zachová monotónnost ostatních úrovní
+    new_levels=$(apply_min_pwm "$current" "$min_pwm") || exit "$EXIT_INTERNAL_ERROR"
 
-    log_info "min-pwm: $current -> $new_levels"
+    if [ "$new_levels" = "$current" ]; then
+        log_info "Minimální PWM $min_pwm je již nastaveno. Nothing to do."
+        return 0
+    fi
+
+    log_info "min-pwm $min_pwm: $current -> $new_levels"
     cmd_levels "$new_levels"
 }
 

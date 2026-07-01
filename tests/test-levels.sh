@@ -15,7 +15,7 @@ fi
 
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
-export RK3399_FANCTL_BACKUP_DIR="$TMP_DIR/backups"
+export RK3399_FANCTL_STATE_DIR="$TMP_DIR"
 export RK3399_FANCTL_LOG_TO_FILE=0
 
 # Minimální DTS s pwm-fan uzlem pro test
@@ -48,7 +48,7 @@ if [ "$new_levels" != "0,32,96,255" ]; then
     fail=1
 fi
 
-if [ ! -f "$TMP_DIR/backups/test.dtb.orig" ]; then
+if [ ! -f "$TMP_DIR/backup/test.dtb.orig" ]; then
     echo "FAIL: záloha nebyla vytvořena"
     fail=1
 fi

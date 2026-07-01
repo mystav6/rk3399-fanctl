@@ -198,7 +198,7 @@ dtb_write_cooling_levels() {
     current=$(dtb_read_cooling_levels "$dtb_path") || return 1
     if [ "$current" = "$new_levels" ]; then
         log_info "Hodnoty jsou shodné se stávajícími. Nothing to do."
-        return 0
+        return 2
     fi
 
     tmp_dts=$(mktemp /tmp/rk3399-fanctl.XXXXXX.dts) || die "mktemp selhal" "$EXIT_INTERNAL_ERROR"
@@ -246,11 +246,16 @@ dtb_write_cooling_levels() {
     # Záloha originálu (před prvním zápisem)
     dtb_backup "$dtb_path" > /dev/null
 
-    # Atomická náhrada
+    # Atomická náhrada - zachováme původní oprávnění souboru
+    # cp -p zachová mode/ownership ze zdroje, ale zdrojem je tmp soubor roota.
+    # Proto nejdřív zkopírujeme s -p (zachová timestamps), pak nastavíme
+    # oprávnění podle originálu pomocí chmod.
+    orig_mode=$(stat -c '%a' "$dtb_path" 2>/dev/null || echo '644')
     cp "$tmp_dtb" "${dtb_path}.new" || {
         rm -f "$tmp_dts" "$tmp_dtb"; trap - EXIT INT TERM
         die "Kopírování nového DTB selhalo" "$EXIT_DTC_FAILED"
     }
+    chmod "$orig_mode" "${dtb_path}.new" || true
     mv -f "${dtb_path}.new" "$dtb_path" || {
         rm -f "$tmp_dts" "$tmp_dtb" "${dtb_path}.new"; trap - EXIT INT TERM
         die "Atomická náhrada DTB selhala" "$EXIT_DTC_FAILED"
@@ -330,8 +335,13 @@ dtb_show() {
     printf 'Aktivní DTB:     %s\n' "$dtb_path"
 
     # Aktuální cooling-levels v DTB
-    if levels=$(dtb_read_cooling_levels "$dtb_path" 2>/dev/null); then
+    if [ ! -r "$dtb_path" ]; then
+        printf 'DTB levels:      %s(pro čtení DTB je potřeba sudo)%s\n' \
+            "$COLOR_YELLOW" "$COLOR_RESET"
+    elif levels=$(dtb_read_cooling_levels "$dtb_path" 2>/dev/null); then
         printf 'DTB levels:      %s\n' "$levels"
+    else
+        printf 'DTB levels:      nelze přečíst\n'
     fi
 
     # Uložený stav

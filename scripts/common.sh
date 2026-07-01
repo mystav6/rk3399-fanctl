@@ -92,6 +92,63 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# --- Výpočet nových cooling-levels s minimálním PWM (varianta B) ----------
+# $1 = aktuální levels jako "0,12,18,255"
+# $2 = nová minimální PWM hodnota
+#
+# Logika (varianta B - monotónnost):
+#   - První hodnota (0 = ventilátor vypnutý) se nikdy nemění
+#   - Druhá hodnota = new_min
+#   - Každá další střední hodnota: max(původní, new_min) - zachová monotónnost
+#   - Poslední hodnota (maximum) se nikdy nemění
+#   - Funguje pro libovolný počet úrovní (ne jen 4)
+#
+# Příklady:
+#   apply_min_pwm "0,12,18,255" 30  ->  "0,30,30,255"
+#   apply_min_pwm "0,12,18,255" 10  ->  "0,10,18,255"  (10 < 18, monotónnost ok)
+#   apply_min_pwm "0,12,18,96,255" 30 -> "0,30,30,96,255"
+apply_min_pwm() {
+    current="$1"
+    new_min="$2"
+
+    # Rozdělíme na pole přes IFS
+    old_ifs="$IFS"; IFS=,
+    # shellcheck disable=SC2086
+    set -- $current || true
+    IFS="$old_ifs"
+
+    total=$#
+    [ "$total" -ge 2 ] || { log_error "apply_min_pwm: potřeba alespoň 2 úrovně"; return 1; }
+
+    result=""
+    idx=0
+    for v in "$@"; do
+        idx=$((idx + 1))
+        if [ "$idx" -eq 1 ]; then
+            # První hodnota (off) - nikdy neměníme
+            new_v="$v"
+        elif [ "$idx" -eq "$total" ]; then
+            # Poslední hodnota (maximum) - nikdy neměníme
+            # POZOR: musí být před kontrolou idx=2, protože při 2 úrovních
+            # je druhá hodnota zároveň poslední - maximum chráníme vždy
+            new_v="$v"
+        elif [ "$idx" -eq 2 ]; then
+            # Druhá hodnota = vždy new_min (smysl --min-pwm)
+            new_v="$new_min"
+        else
+            # Střední hodnoty: max(původní, new_min) - zachová monotónnost
+            if [ "$v" -lt "$new_min" ]; then
+                new_v="$new_min"
+            else
+                new_v="$v"
+            fi
+        fi
+        result="${result:+${result},}${new_v}"
+    done
+
+    printf '%s\n' "$result"
+}
+
 # Validace celého čísla v rozsahu 0-255 (jedna PWM hodnota)
 is_valid_pwm() {
     case "$1" in
