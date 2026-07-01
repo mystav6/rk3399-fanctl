@@ -4,25 +4,6 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
-## [0.3.0] - 2026-07-01
-
-### Přidáno
-- `--min-pwm` příkaz s variantou B (zachování monotónnosti)
-- State management (`/var/lib/rk3399-fanctl/state`)
-- Kernel hook (`/etc/kernel/postinst.d/`) pro automatickou re-aplikaci
-- `--reapply` příkaz
-- CI workflow (GitHub Actions: lint, test, build, release)
-- `CONTRIBUTING.md` a PR šablona
-- `docs/design.md` a `docs/troubleshooting.md`
-
-### Opraveno
-- `--show` bez root zobrazí informativní zprávu místo prázdného řádku
-- Zachování původních oprávnění DTB souboru při zápisu
-- Zavádějící hláška "Hotovo" při "Nothing to do"
-
-
-
-
 ### Plánováno (v1.0)
 - Instalace pomocí `.deb`
 - Automatická detekce desky (NanoPC-T4)

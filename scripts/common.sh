@@ -3,6 +3,8 @@
 # POSIX sh kompatibilní (testováno s dash i bash)
 
 # --- Návratové kódy ---------------------------------------------------
+# shellcheck disable=SC2034
+# Konstanty jsou použity v sourcovaných skriptech (dtb-lib.sh, rk3399-fanctl)
 EXIT_OK=0
 EXIT_INVALID_ARGS=1
 EXIT_NOT_ROOT=2

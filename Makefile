@@ -12,7 +12,7 @@ all: lint test build
 lint:
 	@echo ">> shellcheck"
 	@command -v shellcheck >/dev/null 2>&1 || { echo "shellcheck not installed"; exit 1; }
-	shellcheck -s sh $(SCRIPTS)
+	shellcheck -s sh -x $(SCRIPTS)
 
 test:
 	@echo ">> running tests"

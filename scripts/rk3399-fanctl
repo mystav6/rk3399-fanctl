@@ -2,7 +2,7 @@
 # rk3399-fanctl - správa otáček ventilátoru na RK3399 deskách
 set -eu
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 
 if [ -f "${SCRIPT_DIR}/common.sh" ]; then
     LIB_DIR="$SCRIPT_DIR"
@@ -10,9 +10,9 @@ else
     LIB_DIR="/usr/share/rk3399-fanctl"
 fi
 
-# shellcheck source=./common.sh
+# shellcheck source=scripts/common.sh
 . "${LIB_DIR}/common.sh"
-# shellcheck source=./dtb-lib.sh
+# shellcheck source=scripts/dtb-lib.sh
 . "${LIB_DIR}/dtb-lib.sh"
 
 VERSION="0.3.0-dev"

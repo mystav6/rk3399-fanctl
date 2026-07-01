@@ -36,7 +36,7 @@ jobs:
 
       - name: Run lint
         run: |
-          shellcheck -s sh \
+          shellcheck -s sh -x \
             scripts/rk3399-fanctl \
             scripts/common.sh \
             scripts/dtb-lib.sh \
