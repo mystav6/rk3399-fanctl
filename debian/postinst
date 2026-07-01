@@ -4,7 +4,7 @@ set -e
 mkdir -p /var/lib/rk3399-fanctl/backups
 mkdir -p /var/log
 
-echo "rk3399-fanctl nainstalován."
-echo "Spusťte 'sudo rk3399-fanctl --show' pro zobrazení aktuálního nastavení."
+echo "rk3399-fanctl installed."
+echo "Run 'sudo rk3399-fanctl --show' to display current configuration."
 
 exit 0

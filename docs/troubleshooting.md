@@ -1,63 +1,63 @@
 # Troubleshooting
 
-Tento dokument zachycuje reálné problémy narazené při vývoji a testování
-`rk3399-fanctl` na NanoPC-T4 s Armbian 26.8.x. Může ušetřit hodiny
-hledání ostatním uživatelům RK3399.
+This document captures real issues encountered during development and testing
+of `rk3399-fanctl` on NanoPC-T4 with Armbian 26.8.x. It may save hours of
+searching for other RK3399 users.
 
 ---
 
-## Zařízení zůstalo viset na U-Boot obrazovce po přidání `fdtoverlays`
+## Board stuck at U-Boot screen after adding `fdtoverlays`
 
 ### Symptom
 
-Po přidání direktivy `fdtoverlays` do `/boot/extlinux/extlinux.conf` se
-zařízení při startu zasekne na U-Boot obrazovce a nenabootuje do systému.
+After adding the `fdtoverlays` directive to `/boot/extlinux/extlinux.conf`,
+the board freezes at the U-Boot screen and does not boot into the OS.
 
-### Příčina
+### Cause
 
-Starší verze U-Bootu na RK3399 (typicky flashované do SPI/eMMC na deskách
-jako NanoPC-T4) **nepodporují direktivu `fdtoverlays` v `extlinux.conf`**,
-přestože ji novější U-Boot verze podporují.
+Older U-Boot versions on RK3399 (typically flashed to SPI/eMMC on boards
+like NanoPC-T4) **do not support the `fdtoverlays` directive in `extlinux.conf`**,
+even though newer U-Boot versions do.
 
-Armbian na RK3399 používá pro overlay mechanismus vlastní U-Boot skript
-(`rockchip-fixup.scr`) spouštěný přes `armbianEnv.txt` — ale novější obrazy
-(Armbian 26.x) bootují čistě přes `extlinux.conf` bez `armbianEnv.txt`
-a `boot.scr`, takže overlay mechanismus není dostupný vůbec.
+Armbian historically handled overlays via `armbianEnv.txt` + `boot.scr` +
+`rockchip-fixup.scr` — but newer images (Armbian 26.x) boot purely via
+`extlinux.conf` without these helper files, so the overlay mechanism is
+not available at all.
 
-Proto `rk3399-fanctl` používá přímou úpravu DTB místo overlay přístupu.
+This is why `rk3399-fanctl` uses direct DTB modification instead of overlays.
 
-### Obnova systému
+### Recovery
 
-Pokud se dostanete do této situace, postupujte takto:
+If you encounter this situation:
 
-**1. Připravte SD kartu s Armbianem** a nabootujte z ní.
+**1. Prepare an SD card with Armbian** and boot from it.
 
-**2. Identifikujte eMMC:**
+**2. Identify the eMMC:**
 ```bash
 lsblk
-# eMMC bývá mmcblk2, SD karta mmcblk1
+# eMMC is typically mmcblk2, SD card is mmcblk1
 ```
 
-**3. Připojte boot partition z eMMC:**
+**3. Mount the boot partition from eMMC:**
 ```bash
 sudo mkdir -p /mnt/emmc
 sudo mount -o rw /dev/mmcblk2p1 /mnt/emmc
-# Ověřte že vidíte /boot adresář:
+# Verify you can see the /boot directory:
 sudo ls /mnt/emmc/boot/
 ```
 
-> **Poznámka:** Na některých obrazech může být boot partition prázdná na
-> první pohled — zkuste `sudo ls /mnt/emmc/boot/` i přesto. Adresář `boot`
-> bývá vnořen jako `/mnt/emmc/boot/`.
+> **Note:** On some images the boot partition may appear empty at first glance —
+> try `sudo ls /mnt/emmc/boot/` anyway. The `boot` directory is often nested
+> as `/mnt/emmc/boot/`.
 
-**4. Odstraňte `fdtoverlays` řádek:**
+**4. Remove the `fdtoverlays` line:**
 ```bash
 sudo sed -i '/fdtoverlays/d' /mnt/emmc/boot/extlinux/extlinux.conf
-# Ověřte výsledek:
+# Verify the result:
 sudo cat /mnt/emmc/boot/extlinux/extlinux.conf
 ```
 
-**5. Odpojte a restartujte bez SD karty:**
+**5. Unmount and reboot without SD card:**
 ```bash
 sudo umount /mnt/emmc
 sudo reboot
@@ -65,58 +65,61 @@ sudo reboot
 
 ---
 
-## `--show` nezobrazuje `DTB levels` bez root oprávnění
+## `--show` does not display `DTB levels` without root
 
 ### Symptom
 
 ```
-=== rk3399-fanctl stav ===
-Aktivní DTB:     /boot/dtb/rockchip/rk3399-nanopc-t4.dtb
-Uložený stav:    0,32,96,255 (aplikováno: ...)
+=== rk3399-fanctl status ===
+Active DTB:      /boot/dtb/rockchip/rk3399-nanopc-t4.dtb
+DTB levels:      (sudo required to read DTB)
+Saved state:     0,32,96,255 (applied: ...)
 ```
 
-Chybí řádek `DTB levels: 0,32,96,255`.
+### Cause
 
-### Příčina
+The DTB file in `/boot/dtb/rockchip/` may have permissions `640` or `600` —
+readable only by root. A regular user cannot read it, `dtc` fails and
+`--show` displays the informative message.
 
-DTB soubor v `/boot/dtb/rockchip/` má oprávnění `640` nebo `600` —
-čitelný pouze pro root. Běžný uživatel ho nemůže číst, `dtc` selže
-a `--show` řádek tiše přeskočí.
-
-### Řešení
+### Solution
 
 ```bash
-# Zobrazení s root oprávněními
+# Display with root privileges
 sudo rk3399-fanctl --show
 
-# Nebo nastavte čitelnost DTB pro všechny (volitelné):
+# Or make the DTB world-readable (optional):
 sudo chmod 644 /boot/dtb/rockchip/rk3399-nanopc-t4.dtb
 ```
 
+> **Note:** `rk3399-fanctl` preserves the original file permissions when
+> writing the DTB. If your DTB had `600` before the first `--levels` run,
+> fix it manually with `chmod 644` as shown above.
+
 ---
 
-## Kde jsou zálohy a jak je obnovit
+## Where are backups and how to restore
 
-### Struktura state adresáře
+### State directory structure
 
 ```
 /var/lib/rk3399-fanctl/
-├── state                          ← aktuální konfigurace (cooling-levels, timestamp, kernel)
+├── state                          ← current config (cooling-levels, timestamp, kernel)
 └── backup/
-    ├── rk3399-nanopc-t4.dtb.orig  ← originální DTB před první úpravou
-    └── rk3399-nanopc-t4.dtb.orig.meta  ← metadata zálohy (sha256, timestamp)
+    ├── rk3399-nanopc-t4.dtb.orig      ← original DTB before first modification
+    └── rk3399-nanopc-t4.dtb.orig.meta ← backup metadata (sha256, timestamp)
 ```
 
-### Obnova přes nástroj
+### Restore via tool
 
 ```bash
 sudo rk3399-fanctl --restore
 ```
 
-Obnoví originální DTB a smaže uložený stav. Po restartu bude ventilátor
-opět řízen výchozími `cooling-levels` z DTB.
+Restores the original DTB and clears the saved state. After reboot the fan
+will be controlled by the default `cooling-levels` from the DTB.
 
-### Ruční obnova (pokud nástroj není dostupný)
+### Manual restore (if tool is unavailable)
 
 ```bash
 sudo cp /var/lib/rk3399-fanctl/backup/rk3399-nanopc-t4.dtb.orig \
@@ -124,66 +127,65 @@ sudo cp /var/lib/rk3399-fanctl/backup/rk3399-nanopc-t4.dtb.orig \
 sudo reboot
 ```
 
-### Ověření zálohy
+### Verify backup integrity
 
 ```bash
-# Zobrazení metadat zálohy
+# Show backup metadata
 cat /var/lib/rk3399-fanctl/backup/rk3399-nanopc-t4.dtb.orig.meta
 
-# Ověření integrity zálohy
+# Verify backup checksum
 sha256sum /var/lib/rk3399-fanctl/backup/rk3399-nanopc-t4.dtb.orig
-# Porovnejte s hodnotou sha256= v .meta souboru
+# Compare with the sha256= value in the .meta file
 ```
 
 ---
 
-## Co se stane po aktualizaci kernelu
+## What happens after a kernel update
 
 ### Symptom
 
-Po `sudo apt upgrade` který nainstaloval nový kernel se ventilátor chová
-jako před aplikací `rk3399-fanctl` (příliš hlučný nebo nefunkční při
-nízkém PWM).
+After `sudo apt upgrade` which installed a new kernel, the fan behaves
+as before `rk3399-fanctl` was applied (too loud or not starting at low PWM).
 
-### Příčina
+### Cause
 
-Armbian při aktualizaci kernelu:
-1. Vytvoří nový adresář `/boot/dtb-<nová-verze>/`
-2. Přesměruje symlink `/boot/dtb` na nový adresář
-3. Naše úprava na starém DTB zmizí — nový DTB má výchozí `cooling-levels`
+When Armbian updates the kernel it:
+1. Creates a new directory `/boot/dtb-<new-version>/`
+2. Redirects the `/boot/dtb` symlink to the new directory
+3. Our modification on the old DTB is lost — the new DTB has default `cooling-levels`
 
-### Automatická ochrana
+### Automatic protection
 
-`rk3399-fanctl` instaluje hook do `/etc/kernel/postinst.d/rk3399-fanctl`
-který se spustí automaticky po instalaci nového kernelu a znovu aplikuje
-uložené `cooling-levels` na nový DTB.
+`rk3399-fanctl` installs a hook at `/etc/kernel/postinst.d/rk3399-fanctl`
+that runs automatically after a new kernel is installed and re-applies saved
+`cooling-levels` to the new DTB.
 
-Ověřte že hook je nainstalován:
+Verify the hook is installed:
 ```bash
 ls -la /etc/kernel/postinst.d/rk3399-fanctl
 ```
 
-### Ruční re-aplikace
+### Manual re-application
 
-Pokud automatická re-aplikace selže nebo hook není nainstalován:
+If automatic re-application fails or the hook is not installed:
 ```bash
 sudo rk3399-fanctl --reapply
 ```
 
 ---
 
-## Ověření funkčnosti ventilátoru za běhu
+## Verify fan operation at runtime
 
-Aktuální PWM hodnota ventilátoru (bez restartu):
+Current PWM value of the fan (without reboot):
 
 ```bash
 cat /sys/devices/platform/pwm-fan/hwmon/hwmon*/pwm1
 ```
 
-Hodnota odpovídá aktivní `cooling-level` — závisí na aktuální teplotě CPU
-a nastavení thermal governoru (`step_wise` v Armbianu).
+The value corresponds to the active `cooling-level` — depends on current CPU
+temperature and thermal governor settings (`step_wise` in Armbian).
 
-Ruční nastavení PWM pro testování (dočasné, nepřežije restart):
+Manual PWM override for testing (temporary, does not survive reboot):
 
 ```bash
 echo 128 | sudo tee /sys/devices/platform/pwm-fan/hwmon/hwmon*/pwm1
@@ -191,24 +193,24 @@ echo 128 | sudo tee /sys/devices/platform/pwm-fan/hwmon/hwmon*/pwm1
 
 ---
 
-## Podporované desky a testovaný hardware
+## Supported boards and tested hardware
 
-| Deska       | Armbian verze  | Kernel               | Stav      |
-|-------------|----------------|----------------------|-----------|
-| NanoPC-T4   | 26.8.0-trunk   | 6.18.37-current-rockchip64 | ✅ Otestováno |
-| NanoPi M4   | —              | —                    | 🔲 Netestováno |
-| RockPro64   | —              | —                    | 🔲 Netestováno |
-| ROCK Pi 4   | —              | —                    | 🔲 Netestováno |
+| Board       | Armbian version  | Kernel               | Status    |
+|-------------|------------------|----------------------|-----------|
+| NanoPC-T4   | 26.8.0-trunk     | 6.18.37-current-rockchip64 | ✅ Tested |
+| NanoPi M4   | —                | —                    | 🔲 Untested |
+| RockPro64   | —                | —                    | 🔲 Untested |
+| ROCK Pi 4   | —                | —                    | 🔲 Untested |
 
 ---
 
-## Hlášení chyb
+## Reporting bugs
 
-Pokud narazíte na problém který není popsán zde, přiložte prosím výstup:
+If you encounter an issue not described here, please include the output of:
 
 ```bash
 sudo rk3399-fanctl --show
 uname -r
 cat /etc/armbian-release | grep -E "VERSION|BOARD|BRANCH"
-cat /boot/extlinux/extlinux.conf
+sudo cat /boot/extlinux/extlinux.conf
 ```

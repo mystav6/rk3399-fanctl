@@ -1,29 +1,37 @@
 # Changelog
 
-Formát vychází z [Keep a Changelog](https://keepachangelog.com/).
+Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
-### Plánováno (v1.0)
-- Instalace pomocí `.deb`
-- Automatická detekce desky (NanoPC-T4)
-- Automatická detekce použitého DTB (z `extlinux.conf`)
-- Automatická záloha původního DTB
-- Obnova původního DTB (`--restore`)
-- Zobrazení aktuálních cooling-levels (`--show`)
-- Nastavení vlastních hodnot (`--levels`)
-- Nastavení minimálního PWM (`--min-pwm`)
-- Validace vstupních hodnot
-- Verifikace po zápisu (`--verify`)
-- Barevný výstup a logování
-- Makefile + build skript
-- Dokumentace
+## [0.3.0] - 2026-07-01
 
-### Plánováno (v1.1)
-- Automatická kalibrace (`--calibrate`)
+### Added
+- `--min-pwm` command with variant B logic (preserves monotonicity)
+- State management (`/var/lib/rk3399-fanctl/state`)
+- Kernel hook (`/etc/kernel/postinst.d/`) for automatic re-application after kernel updates
+- `--reapply` command
+- GitHub Actions CI workflow (lint, test, build, release)
+- `CONTRIBUTING.md` and PR template
+- `docs/design.md` and `docs/troubleshooting.md`
 
-### Plánováno (v1.2)
-- Live monitoring (`--monitor`)
+### Fixed
+- `--show` without root now displays informative message instead of blank line
+- Preserve original DTB file permissions after write (was: 600, now: original mode)
+- Misleading "Done" message when "Nothing to do"
+- DTB sanity check size reduced from 512B to 64B (was failing on minimal test DTBs)
+- shellcheck: SC1007, SC2034, SC1091 warnings resolved
 
-### Plánováno (v2.0)
-- Podpora dalších RK3399 desek (NanoPi M4, RockPro64, ROCK Pi 4)
+## [0.2.0] - 2026-07-01
+
+### Added
+- Initial working implementation
+- `--show`, `--levels`, `--restore`, `--verify` commands
+- Safe DTB write with atomic mv and backup
+- Automatic DTB detection from extlinux.conf
+- Colored output and structured logging
+
+### Notes
+- DTB overlay approach (fdtoverlays in extlinux.conf) was evaluated and rejected:
+  U-Boot on RK3399 boards does not support this directive and the board
+  failed to boot. Direct DTB modification was chosen instead.

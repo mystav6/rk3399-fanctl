@@ -1,28 +1,28 @@
-## Popis změn
+## Description
 
-<!-- Co tato změna dělá a proč? -->
+<!-- What does this change do and why? -->
 
-## Typ změny
+## Type of change
 
-- [ ] Oprava chyby (bug fix)
-- [ ] Nová funkce
-- [ ] Vylepšení dokumentace
-- [ ] Podpora nové desky
-- [ ] Refactoring (bez změny chování)
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Documentation improvement
+- [ ] New board support
+- [ ] Refactoring (no behavior change)
 
-## Testováno na
+## Tested on
 
-<!-- Uveďte hardware a verzi Armbianu kde bylo testováno -->
+<!-- List hardware and Armbian version where this was tested -->
 
 - [ ] NanoPC-T4 (Armbian ______)
 - [ ] NanoPi M4
 - [ ] RockPro64
 - [ ] ROCK Pi 4
-- [ ] Jiné: ______
+- [ ] Other: ______
 
 ## Checklist
 
-- [ ] `shellcheck` projde bez varování (`make lint`)
-- [ ] Všechny testy projdou (`make test`)
-- [ ] `CHANGELOG.md` aktualizován v sekci `[Unreleased]`
-- [ ] Dokumentace aktualizována (pokud je relevantní)
+- [ ] `shellcheck` passes without warnings (`make lint`)
+- [ ] All tests pass (`make test`)
+- [ ] `CHANGELOG.md` updated in `[Unreleased]` section
+- [ ] Documentation updated (if relevant)

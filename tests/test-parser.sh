@@ -10,7 +10,7 @@ fail=0
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-# Připravíme falešný extlinux.conf + falešný DTB soubor
+# Prepare falešný extlinux.conf + falešný DTB soubor
 mkdir -p "$TMP_DIR/boot/dtb/rockchip"
 touch "$TMP_DIR/boot/dtb/rockchip/rk3399-nanopc-t4.dtb"
 

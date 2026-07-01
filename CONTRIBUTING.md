@@ -1,92 +1,93 @@
-# Jak přispět do projektu
+# Contributing
 
-Děkujeme za zájem o přispění do `rk3399-fanctl`. Tento dokument popisuje
-jak projekt sestavit, otestovat a odeslat Pull Request.
+Thank you for your interest in contributing to `rk3399-fanctl`.
+This document describes how to build, test, and submit a Pull Request.
 
-## Požadavky pro vývoj
+## Development requirements
 
 ```bash
 sudo apt install device-tree-compiler shellcheck dpkg-dev
 ```
 
-## Sestavení a testování
+## Build and test
 
 ```bash
-# Klonování
-git clone https://github.com/<tvůj-nick>/rk3399-fanctl.git
+# Clone
+git clone https://github.com/<your-nick>/rk3399-fanctl.git
 cd rk3399-fanctl
 
 # Lint (shellcheck)
 make lint
 
-# Testy
+# Tests
 make test
 
-# Sestavení .deb
+# Build .deb
 make build
 ```
 
-## Struktura projektu
+## Project structure
 
 ```
 scripts/
-├── rk3399-fanctl     hlavní CLI vstupní bod
-├── common.sh         logování, návratové kódy, pomocné funkce
-├── dtb-lib.sh        práce s DTB (čtení, zápis, záloha, state)
-└── kernel-hook.sh    hook pro automatickou re-aplikaci po aktualizaci kernelu
+├── rk3399-fanctl      main CLI entry point
+├── common.sh          logging, return codes, helper functions
+├── dtb-lib.sh         DTB operations (read, write, backup, state)
+└── kernel-hook.sh     hook for automatic re-application after kernel updates
 
 tests/
-├── test-parser.sh    testy detekce DTB z extlinux.conf
-├── test-validation.sh testy validace PWM hodnot
-└── test-levels.sh    integrační test čtení/zápisu cooling-levels (vyžaduje dtc)
+├── test-parser.sh     DTB detection from extlinux.conf
+├── test-validation.sh PWM value validation
+├── test-min-pwm.sh    --min-pwm logic (variant B)
+└── test-levels.sh     integration test for read/write cooling-levels (requires dtc)
 
 docs/
-├── design.md         architektonická rozhodnutí
-├── troubleshooting.md řešení problémů
-└── internals.md      (plánováno)
+├── design.md          architectural decisions
+├── troubleshooting.md troubleshooting guide
+└── internals.md       (planned)
 ```
 
-## Pravidla pro kód
+## Code style
 
-- **POSIX sh** — bez bash-specific syntaxe (žádné `[[`, `(( ))`, `$'...'`)
-- **shellcheck čistý** — `make lint` musí projít bez varování
-- **Návratové kódy** — používejte konstanty z `common.sh` (`EXIT_OK`, `EXIT_INVALID_ARGS` atd.)
-- **Logování** — pouze přes funkce z `common.sh` (`log_info`, `log_ok`, `log_error` atd.)
-- **Atomické zápisy** — jakýkoliv zápis souboru přes dočasný soubor + `mv`
-- **Komentáře** — každá veřejná funkce má komentář popisující co dělá a co vrací
+- **POSIX sh** — no bash-specific syntax (no `[[`, `(( ))`, `$'...'`)
+- **shellcheck clean** — `make lint` must pass without warnings
+- **Return codes** — use constants from `common.sh` (`EXIT_OK`, `EXIT_INVALID_ARGS` etc.)
+- **Logging** — only via functions from `common.sh` (`log_info`, `log_ok`, `log_error` etc.)
+- **Atomic writes** — any file write via temp file + `mv`
+- **Comments** — every public function has a comment describing what it does and what it returns
 
-## Přidání podpory pro novou desku
+## Adding support for a new board
 
-1. Ověřte že deska používá `pwm-fan` uzel s `cooling-levels` v DTB:
+1. Verify the board uses a `pwm-fan` node with `cooling-levels` in the DTB:
    ```bash
-   dtc -I dtb -O dts /boot/dtb/rockchip/<vaše-deska>.dtb 2>/dev/null \
+   dtc -I dtb -O dts /boot/dtb/rockchip/<your-board>.dtb 2>/dev/null \
        | grep -A5 "pwm-fan"
    ```
 
-2. Přidejte detekci modelu do `dtb-lib.sh` (`board_detect_model`)
+2. Add model detection to `dtb-lib.sh` (`board_detect_model`)
 
-3. Přidejte desku do tabulky v `docs/troubleshooting.md`
+3. Add the board to the table in `docs/troubleshooting.md`
 
-4. Otestujte všechny příkazy na reálném hardware a popište výsledky v PR
+4. Test all commands on real hardware and describe results in the PR
 
-## Verzování
+## Versioning
 
-Projekt používá [Semantic Versioning](https://semver.org/):
+The project uses [Semantic Versioning](https://semver.org/):
 
-- `0.x.y` — dokud není stabilní API (aktuální stav)
-- `MAJOR.MINOR.PATCH` — po dosažení v1.0.0
+- `0.x.y` — while API is not yet stable (current state)
+- `MAJOR.MINOR.PATCH` — after reaching v1.0.0
 
-Release se vytvoří pushnutím tagu:
+Create a release by pushing a tag:
 ```bash
-git tag v0.3.0
-git push origin v0.3.0
+git tag v0.4.0
+git push origin v0.4.0
 ```
 
-GitHub Actions automaticky sestaví `.deb` a vytvoří Release.
+GitHub Actions will automatically build the `.deb` and create a Release.
 
-## Hlášení chyb
+## Reporting bugs
 
-Při hlášení chyby prosím přiložte:
+When reporting a bug please include:
 
 ```bash
 sudo rk3399-fanctl --show

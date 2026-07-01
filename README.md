@@ -1,17 +1,17 @@
 # rk3399-fanctl
 
-Open-source utilita pro správu otáček ventilátoru (`pwm-fan`) na deskách
-s čipem RK3399 (NanoPC-T4, NanoPi M4, RockPro64, ROCK Pi 4 a další).
+Open-source utility for managing PWM fan speed (`pwm-fan`) on boards
+with the RK3399 chip (NanoPC-T4, NanoPi M4, RockPro64, ROCK Pi 4 and others).
 
-Řeší problém příliš agresivních výchozích `cooling-levels` v Device Tree,
-které způsobují, že ventilátor běží hlučně i při nízké zátěži (nebo naopak
-se vůbec nerozjede při nízkém PWM).
+Solves the problem of overly aggressive default `cooling-levels` in the Device Tree,
+which cause the fan to run loudly even under low load (or conversely,
+fail to start at low PWM values).
 
-## Stav projektu
+## Project status
 
-🚧 Ve vývoji — fáze 1 (základ projektu).
+✅ v0.3.0 — tested on NanoPC-T4 with Armbian 26.8.x
 
-## Plánované funkce
+## Features
 
 ```
 rk3399-fanctl --show
@@ -20,41 +20,76 @@ rk3399-fanctl --min-pwm 32
 rk3399-fanctl --backup
 rk3399-fanctl --restore
 rk3399-fanctl --verify
-rk3399-fanctl --calibrate
-rk3399-fanctl --monitor
+rk3399-fanctl --reapply
+rk3399-fanctl --calibrate  (planned v1.1)
+rk3399-fanctl --monitor    (planned v1.2)
 ```
 
-## Podporované desky
+## Supported boards
 
 - [x] NanoPC-T4 (RK3399)
 - [ ] NanoPi M4
 - [ ] RockPro64
 - [ ] ROCK Pi 4
 
-## Instalace
+## Installation
 
 ```bash
+# Install dependency
+sudo apt install device-tree-compiler
+
+# Build and install
 make build
 sudo dpkg -i dist/rk3399-fanctl_*.deb
 ```
 
-## Vývoj
+## Quick start
 
 ```bash
-make lint    # shellcheck nad scripts/
-make test    # spustí tests/
-make build   # vytvoří .deb balíček
+# Show current status
+sudo rk3399-fanctl --show
+
+# Set custom cooling-levels
+sudo rk3399-fanctl --levels 0,32,96,255
+
+# Or just set minimum PWM (preserves other levels)
+sudo rk3399-fanctl --min-pwm 30
+
+# Restore original DTB
+sudo rk3399-fanctl --restore
 ```
 
-## Licence
+## How it works
 
-MIT (viz LICENSE)
+`rk3399-fanctl` directly modifies the Device Tree Blob (DTB) in `/boot/dtb/rockchip/`.
+The original DTB is always backed up before the first modification.
 
-## Bezpečnostní poznámka
+After a kernel update via `apt`, Armbian redirects the `/boot/dtb` symlink to a new
+directory — our changes would be lost. Therefore `rk3399-fanctl` installs a kernel hook
+at `/etc/kernel/postinst.d/rk3399-fanctl` that automatically re-applies saved
+cooling-levels to the new DTB after every kernel update.
 
-Tento nástroj upravuje Device Tree Blob (DTB), který je nutný pro nabootování
-desky. Vždy se před úpravou vytváří záloha (`--backup`), ale i tak doporučujeme:
+> **Note:** Device Tree Overlay (`fdtoverlays` in extlinux.conf) was evaluated
+> but is not supported by U-Boot on RK3399 boards. See [docs/troubleshooting.md](docs/troubleshooting.md).
 
-1. mít k dispozici sériovou konzoli nebo alternativní způsob přístupu k desce,
-2. otestovat `--restore` ještě před tím, než provedete vlastní úpravu,
-3. nepoužívat na produkčních systémech bez zálohy celého bootovacího oddílu.
+## Development
+
+```bash
+make lint    # shellcheck
+make test    # run tests
+make build   # build .deb package
+```
+
+## License
+
+MIT — see [LICENSE](LICENSE)
+
+## Safety note
+
+This tool modifies the Device Tree Blob (DTB) required for booting.
+A backup is always created before modification (`--restore` to recover),
+but we still recommend:
+
+1. Having serial console access or an SD card with a working Armbian image
+2. Testing `--restore` before making any changes on a critical system
+3. See [docs/troubleshooting.md](docs/troubleshooting.md) for recovery procedures
