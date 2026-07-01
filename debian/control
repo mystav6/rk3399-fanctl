@@ -1,0 +1,12 @@
+Package: rk3399-fanctl
+Version: 0.1.0-dev
+Section: utils
+Priority: optional
+Architecture: all
+Depends: device-tree-compiler, coreutils
+Maintainer: Your Name <you@example.com>
+Description: Fan control utility for RK3399 boards (NanoPC-T4 and others)
+ rk3399-fanctl manages PWM fan cooling-levels in the Device Tree of
+ RK3399-based single board computers. It provides safe backup/restore
+ of the DTB, validation of input values, and (planned) automatic fan
+ calibration and live monitoring.

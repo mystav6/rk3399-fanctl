@@ -1,0 +1,193 @@
+#!/bin/sh
+# rk3399-fanctl - správa otáček ventilátoru na RK3399 deskách
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+
+if [ -f "${SCRIPT_DIR}/common.sh" ]; then
+    LIB_DIR="$SCRIPT_DIR"
+else
+    LIB_DIR="/usr/share/rk3399-fanctl"
+fi
+
+# shellcheck source=./common.sh
+. "${LIB_DIR}/common.sh"
+# shellcheck source=./dtb-lib.sh
+. "${LIB_DIR}/dtb-lib.sh"
+
+VERSION="0.3.0-dev"
+
+# Příznak pro kernel hook - přeskočí uložení stavu (stav už je uložen)
+NO_STATE_UPDATE=0
+
+usage() {
+    cat <<'EOF'
+rk3399-fanctl - správa otáček ventilátoru na RK3399 deskách
+
+POUŽITÍ:
+    rk3399-fanctl [PŘÍKAZ] [VOLBY]
+
+PŘÍKAZY:
+    --show              Zobrazí aktuální stav (cooling-levels, záloha, stav)
+    --levels L,L,L,L   Nastaví vlastní cooling-levels (0-255, čárkou odděleno)
+    --min-pwm N         Nastaví pouze minimální PWM (zachová ostatní úrovně)
+    --restore           Obnoví originální DTB ze zálohy
+    --verify            Ověří, že DTB odpovídá uloženému stavu
+    --reapply           Znovu aplikuje uložené cooling-levels (po aktualizaci kernelu)
+    --calibrate         (v1.1) Automatická kalibrace minimálního PWM
+    --monitor           (v1.2) Live monitoring teploty/PWM
+    --version           Zobrazí verzi
+    --help              Zobrazí tuto nápovědu
+
+INTERNÍ VOLBY (pro hooky):
+    --no-state-update   Neaktualizuje uložený stav (použito kernel hookem)
+
+PŘÍKLADY:
+    sudo rk3399-fanctl --show
+    sudo rk3399-fanctl --levels 0,32,96,255
+    sudo rk3399-fanctl --min-pwm 30
+    sudo rk3399-fanctl --restore
+
+POZNÁMKA:
+    Cooling-levels jsou uloženy v /var/lib/rk3399-fanctl/state a automaticky
+    znovu aplikovány po každé aktualizaci kernelu přes /etc/kernel/postinst.d/.
+EOF
+}
+
+cmd_show() {
+    printf '\n%s=== rk3399-fanctl stav ===%s\n\n' "$COLOR_BOLD" "$COLOR_RESET"
+    dtb_show
+    printf '\n'
+}
+
+cmd_levels() {
+    new_levels="$1"
+    require_root
+
+    dtb_validate_levels "$new_levels" || exit "$EXIT_INVALID_ARGS"
+
+    dtb_path=$(dtb_resolve_active) || \
+        die "Nelze nalézt aktivní DTB" "$EXIT_DTB_NOT_FOUND"
+
+    log_info "Nastavuji cooling-levels: $new_levels"
+    log_info "Cílový DTB: $dtb_path"
+
+    dtb_write_cooling_levels "$dtb_path" "$new_levels" || exit "$EXIT_DTC_FAILED"
+    dtb_verify "$dtb_path" "$new_levels"               || exit "$EXIT_VERIFY_FAILED"
+
+    # Uložíme stav pro kernel hook (pokud --no-state-update není nastaven)
+    if [ "$NO_STATE_UPDATE" -eq 0 ]; then
+        dtb_state_save "$new_levels" "$dtb_path"
+    fi
+
+    printf '\n'
+    log_ok "Hotovo. Změny jsou okamžitě aktivní."
+    log_info "Po aktualizaci kernelu budou cooling-levels automaticky znovu aplikovány."
+}
+
+cmd_min_pwm() {
+    min_pwm="$1"
+    is_valid_pwm "$min_pwm" || \
+        die "Neplatná PWM hodnota '$min_pwm'. Rozsah je 0-255." "$EXIT_INVALID_ARGS"
+    require_root
+
+    dtb_path=$(dtb_resolve_active) || \
+        die "Nelze nalézt aktivní DTB" "$EXIT_DTB_NOT_FOUND"
+    current=$(dtb_read_cooling_levels "$dtb_path") || exit "$EXIT_DTC_FAILED"
+
+    log_debug "Aktuální levels: $current"
+
+    # Nahradíme druhou hodnotu (minimální PWM) - první je vždy 0
+    new_levels=$(printf '%s' "$current" | awk -F, -v m="$min_pwm" '{
+        $2 = m; OFS=","; print $1,$2,$3,$4
+    }')
+
+    log_info "min-pwm: $current -> $new_levels"
+    cmd_levels "$new_levels"
+}
+
+cmd_restore() {
+    require_root
+
+    dtb_path=$(dtb_resolve_active) || \
+        die "Nelze nalézt aktivní DTB" "$EXIT_DTB_NOT_FOUND"
+
+    log_info "Obnovuji originální DTB..."
+    dtb_restore "$dtb_path"
+    dtb_state_clear
+
+    printf '\n'
+    log_ok "Originální DTB obnoven. Automatická re-aplikace po aktualizaci kernelu zrušena."
+}
+
+cmd_verify() {
+    dtb_path=$(dtb_resolve_active) || \
+        die "Nelze nalézt aktivní DTB" "$EXIT_DTB_NOT_FOUND"
+
+    saved=$(dtb_state_load) || {
+        log_warn "Žádný uložený stav. Nástroj ještě nebyl použit nebo byl spuštěn --restore."
+        return 0
+    }
+
+    dtb_verify "$dtb_path" "$saved"
+}
+
+cmd_reapply() {
+    require_root
+
+    saved=$(dtb_state_load) || {
+        log_info "Žádný uložený stav - není co aplikovat."
+        return 0
+    }
+
+    log_info "Znovu aplikuji uložené cooling-levels: $saved"
+    NO_STATE_UPDATE=1
+    cmd_levels "$saved"
+}
+
+main() {
+    [ $# -eq 0 ] && { usage; exit "$EXIT_INVALID_ARGS"; }
+
+    # Zpracování interních příznaků (mohou být kdekoliv v argumentech)
+    for arg in "$@"; do
+        case "$arg" in
+            --no-state-update) NO_STATE_UPDATE=1 ;;
+        esac
+    done
+
+    case "$1" in
+        --show)      cmd_show ;;
+        --levels)
+            [ $# -ge 2 ] || die "Chybí hodnota pro --levels" "$EXIT_INVALID_ARGS"
+            cmd_levels "$2"
+            ;;
+        --min-pwm)
+            [ $# -ge 2 ] || die "Chybí hodnota pro --min-pwm" "$EXIT_INVALID_ARGS"
+            cmd_min_pwm "$2"
+            ;;
+        --restore)   cmd_restore ;;
+        --verify)    cmd_verify ;;
+        --reapply)   cmd_reapply ;;
+        --calibrate)
+            log_error "--calibrate je plánováno pro v1.1"
+            exit "$EXIT_INVALID_ARGS"
+            ;;
+        --monitor)
+            log_error "--monitor je plánováno pro v1.2"
+            exit "$EXIT_INVALID_ARGS"
+            ;;
+        --version)
+            printf 'rk3399-fanctl %s\n' "$VERSION"
+            ;;
+        --help|-h)   usage ;;
+        --no-state-update) ;;  # interní příznak, ne příkaz
+        *)
+            log_error "Neznámý příkaz: $1"
+            printf '\n'
+            usage
+            exit "$EXIT_INVALID_ARGS"
+            ;;
+    esac
+}
+
+main "$@"

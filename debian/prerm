@@ -1,0 +1,7 @@
+#!/bin/sh
+set -e
+
+# Zatím nic speciálního - DTB zálohy ponecháváme i po odinstalaci
+# (mažou se jen při --purge, viz postrm).
+
+exit 0

@@ -1,0 +1,102 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # potřebné pro vytvoření GitHub Release
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # potřebujeme historii pro changelog
+
+      - name: Install dependencies
+        run: sudo apt-get install -y dpkg-dev device-tree-compiler shellcheck
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      - name: Update version in scripts
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          sed -i "s/^VERSION=.*/VERSION=\"${VERSION}\"/" scripts/rk3399-fanctl
+          sed -i "s/^VERSION  :=.*/VERSION  := ${VERSION}/" Makefile
+          sed -i "s/^Version:.*/Version: ${VERSION}/" debian/control
+
+      - name: Run lint
+        run: |
+          shellcheck -s sh \
+            scripts/rk3399-fanctl \
+            scripts/common.sh \
+            scripts/dtb-lib.sh \
+            scripts/kernel-hook.sh
+
+      - name: Run tests
+        run: make test
+
+      - name: Build .deb
+        run: bash build.sh
+
+      - name: Extract changelog entry for this version
+        id: changelog
+        run: |
+          # Vytáhneme sekci pro aktuální verzi z CHANGELOG.md
+          VERSION="${{ steps.version.outputs.version }}"
+          NOTES=$(awk -v ver="$VERSION" '
+            /^## \[/ {
+              if (found) exit
+              if (index($0, ver)) found=1
+              next
+            }
+            found { print }
+          ' CHANGELOG.md)
+
+          if [ -z "$NOTES" ]; then
+            NOTES="Viz CHANGELOG.md pro seznam změn."
+          fi
+
+          # GitHub Actions multiline output
+          {
+            echo "notes<<EOF"
+            echo "$NOTES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: rk3399-fanctl ${{ steps.version.outputs.tag }}
+          body: |
+            ## Instalace
+
+            ```bash
+            wget https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/rk3399-fanctl_${{ steps.version.outputs.version }}.deb
+            sudo dpkg -i rk3399-fanctl_${{ steps.version.outputs.version }}.deb
+            ```
+
+            ## Změny v této verzi
+
+            ${{ steps.changelog.outputs.notes }}
+
+            ## Podporovaný hardware
+
+            - NanoPC-T4 (RK3399, Armbian 26.x)
+
+            ## Závislosti
+
+            - `device-tree-compiler` (`sudo apt install device-tree-compiler`)
+          files: dist/*.deb
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
