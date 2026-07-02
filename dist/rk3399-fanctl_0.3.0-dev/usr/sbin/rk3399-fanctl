@@ -1,0 +1,211 @@
+#!/bin/sh
+# rk3399-fanctl - PWM fan speed management for RK3399 boards
+set -eu
+
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+
+if [ -f "${SCRIPT_DIR}/common.sh" ]; then
+    LIB_DIR="$SCRIPT_DIR"
+else
+    LIB_DIR="/usr/share/rk3399-fanctl"
+fi
+
+# shellcheck source=scripts/common.sh
+. "${LIB_DIR}/common.sh"
+# shellcheck source=scripts/dtb-lib.sh
+. "${LIB_DIR}/dtb-lib.sh"
+
+VERSION="0.3.0"
+
+# Flag for kernel hook - skip saving state (state is already saved)
+NO_STATE_UPDATE=0
+
+usage() {
+    cat <<'USAGE'
+rk3399-fanctl - PWM fan speed management for RK3399 boards
+
+USAGE:
+    rk3399-fanctl [COMMAND] [OPTIONS]
+
+COMMANDS:
+    --show              Show current status (cooling-levels, backup, state)
+    --levels L,L,L,L   Set custom cooling-levels (0-255, comma-separated)
+    --min-pwm N         Set minimum PWM only (preserves other levels)
+    --restore           Restore original DTB from backup
+    --verify            Verify DTB matches saved state
+    --reapply           Re-apply saved cooling-levels (after kernel update)
+    --calibrate         (v1.1) Automatic minimum PWM calibration
+    --monitor           (v1.2) Live temperature/PWM monitoring
+    --version           Show version
+    --help              Show this help
+
+INTERNAL OPTIONS (for hooks):
+    --no-state-update   Do not update saved state (used by kernel hook)
+
+EXAMPLES:
+    sudo rk3399-fanctl --show
+    sudo rk3399-fanctl --levels 0,32,96,255
+    sudo rk3399-fanctl --min-pwm 30
+    sudo rk3399-fanctl --restore
+
+NOTE:
+    Cooling-levels are saved to /var/lib/rk3399-fanctl/state and automatically
+    re-applied after every kernel update via /etc/kernel/postinst.d/.
+USAGE
+}
+
+cmd_show() {
+    printf '\n%s=== rk3399-fanctl status ===%s\n\n' "$COLOR_BOLD" "$COLOR_RESET"
+    dtb_show
+    printf '\n'
+}
+
+cmd_levels() {
+    new_levels="$1"
+    require_root
+
+    dtb_validate_levels "$new_levels" || exit "$EXIT_INVALID_ARGS"
+
+    dtb_path=$(dtb_resolve_active) || \
+        die "Cannot find active DTB" "$EXIT_DTB_NOT_FOUND"
+
+    log_info "Setting cooling-levels: $new_levels"
+    log_info "Target DTB: $dtb_path"
+
+    dtb_write_cooling_levels "$dtb_path" "$new_levels"
+    write_rc=$?
+
+    if [ "$write_rc" -eq 2 ]; then
+        # Nothing to do - values are the same, just save state
+        if [ "$NO_STATE_UPDATE" -eq 0 ]; then
+            dtb_state_save "$new_levels" "$dtb_path"
+        fi
+        printf '\n'
+        log_ok "cooling-levels $new_levels are already set."
+        log_info "State saved for automatic re-application after kernel update."
+        return 0
+    fi
+
+    [ "$write_rc" -eq 0 ] || exit "$EXIT_DTC_FAILED"
+
+    dtb_verify "$dtb_path" "$new_levels" || exit "$EXIT_VERIFY_FAILED"
+
+    # Save state for kernel hook
+    if [ "$NO_STATE_UPDATE" -eq 0 ]; then
+        dtb_state_save "$new_levels" "$dtb_path"
+    fi
+
+    printf '\n'
+    log_ok "Done. New cooling-levels are immediately active."
+    log_info "Will be automatically re-applied after kernel updates."
+}
+
+cmd_min_pwm() {
+    min_pwm="$1"
+    is_valid_pwm "$min_pwm" || \
+        die "Invalid PWM value '$min_pwm'. Range is 0-255." "$EXIT_INVALID_ARGS"
+    require_root
+
+    dtb_path=$(dtb_resolve_active) || \
+        die "Cannot find active DTB" "$EXIT_DTB_NOT_FOUND"
+    current=$(dtb_read_cooling_levels "$dtb_path") || exit "$EXIT_DTC_FAILED"
+
+    log_debug "Current levels: $current"
+
+    # Variant B: replace min PWM and preserve monotonicity of other levels
+    new_levels=$(apply_min_pwm "$current" "$min_pwm") || exit "$EXIT_INTERNAL_ERROR"
+
+    if [ "$new_levels" = "$current" ]; then
+        log_info "Minimum PWM $min_pwm is already set. Nothing to do."
+        return 0
+    fi
+
+    log_info "min-pwm $min_pwm: $current -> $new_levels"
+    cmd_levels "$new_levels"
+}
+
+cmd_restore() {
+    require_root
+
+    dtb_path=$(dtb_resolve_active) || \
+        die "Cannot find active DTB" "$EXIT_DTB_NOT_FOUND"
+
+    log_info "Restoring original DTB..."
+    dtb_restore "$dtb_path"
+    dtb_state_clear
+
+    printf '\n'
+    log_ok "Original DTB restored. Automatic re-application after kernel update cancelled."
+}
+
+cmd_verify() {
+    dtb_path=$(dtb_resolve_active) || \
+        die "Cannot find active DTB" "$EXIT_DTB_NOT_FOUND"
+
+    saved=$(dtb_state_load) || {
+        log_warn "No saved state. Tool has not been used yet or --restore was run."
+        return 0
+    }
+
+    dtb_verify "$dtb_path" "$saved"
+}
+
+cmd_reapply() {
+    require_root
+
+    saved=$(dtb_state_load) || {
+        log_info "No saved state - nothing to apply."
+        return 0
+    }
+
+    log_info "Re-applying saved cooling-levels: $saved"
+    NO_STATE_UPDATE=1
+    cmd_levels "$saved"
+}
+
+main() {
+    [ $# -eq 0 ] && { usage; exit "$EXIT_INVALID_ARGS"; }
+
+    # Process internal flags (can appear anywhere in arguments)
+    for arg in "$@"; do
+        case "$arg" in
+            --no-state-update) NO_STATE_UPDATE=1 ;;
+        esac
+    done
+
+    case "$1" in
+        --show)      cmd_show ;;
+        --levels)
+            [ $# -ge 2 ] || die "Missing value for --levels" "$EXIT_INVALID_ARGS"
+            cmd_levels "$2"
+            ;;
+        --min-pwm)
+            [ $# -ge 2 ] || die "Missing value for --min-pwm" "$EXIT_INVALID_ARGS"
+            cmd_min_pwm "$2"
+            ;;
+        --restore)   cmd_restore ;;
+        --verify)    cmd_verify ;;
+        --reapply)   cmd_reapply ;;
+        --calibrate)
+            log_error "--calibrate is planned for v1.1, not yet implemented."
+            exit "$EXIT_INVALID_ARGS"
+            ;;
+        --monitor)
+            log_error "--monitor is planned for v1.2, not yet implemented."
+            exit "$EXIT_INVALID_ARGS"
+            ;;
+        --version)
+            printf 'rk3399-fanctl %s\n' "$VERSION"
+            ;;
+        --help|-h)   usage ;;
+        --no-state-update) ;;  # internal flag, not a command
+        *)
+            log_error "Unknown command: $1"
+            printf '\n'
+            usage
+            exit "$EXIT_INVALID_ARGS"
+            ;;
+    esac
+}
+
+main "$@"
