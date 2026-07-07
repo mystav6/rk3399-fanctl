@@ -1,5 +1,5 @@
 PROJECT  := rk3399-fanctl
-VERSION  := 0.5.0
+VERSION  := 0.5.3
 DIST_DIR := dist
 
 SCRIPTS := scripts/rk3399-fanctl scripts/common.sh scripts/dtb-lib.sh \
