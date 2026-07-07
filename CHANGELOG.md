@@ -4,6 +4,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-07-07
+
+### Added
+- `docs/installation.md` document - Installation document
+
+### Notes
+- Reupload of bad commit, added installation manual
+
 ## [0.5.0] - 2026-07-07
 
 ### Added
