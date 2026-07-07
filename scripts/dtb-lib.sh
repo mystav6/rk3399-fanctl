@@ -317,6 +317,78 @@ dtb_state_load() {
     printf '%s\n' "$saved_levels"
 }
 
+# --- JSON export for monitoring integration -------------------------------
+# Outputs fan status as JSON to stdout.
+# Designed to be called from status-export.sh and merged into
+# the existing t4-1-status.json / t4-2-status.json.
+#
+# Output example:
+# {
+#   "pwm": 32,
+#   "pwm_max": 255,
+#   "pwm_pct": 13,
+#   "cooling_level": 1,
+#   "cooling_levels_total": 4,
+#   "configured_levels": "0,32,96,255",
+#   "state": "on"
+# }
+fan_export_json() {
+    # hwmon number may vary - find the right one
+    pwm_file=""
+    for f in /sys/devices/platform/pwm-fan/hwmon/hwmon*/pwm1; do
+        [ -r "$f" ] && pwm_file="$f" && break
+    done
+
+    # Read current PWM
+    pwm=0
+    if [ -n "$pwm_file" ] && [ -r "$pwm_file" ]; then
+        pwm=$(cat "$pwm_file" 2>/dev/null || echo 0)
+    fi
+
+    pwm_max=255
+    pwm_pct=$(( (pwm * 100) / pwm_max ))
+
+    # Fan state
+    if [ "$pwm" -eq 0 ]; then
+        fan_state="off"
+    else
+        fan_state="on"
+    fi
+
+    # Configured levels from saved state
+    configured_levels=""
+    cooling_level=0
+    cooling_levels_total=0
+
+    saved=$(dtb_state_load 2>/dev/null) || saved=""
+
+    if [ -n "$saved" ]; then
+        configured_levels="$saved"
+        # Count total levels and find active cooling level
+        idx=0
+        old_ifs="$IFS"; IFS=,
+        for v in $saved; do
+            cooling_levels_total=$((cooling_levels_total + 1))
+            # Active level = highest level whose PWM value <= current pwm
+            if [ "$v" -le "$pwm" ]; then
+                cooling_level=$idx
+            fi
+            idx=$((idx + 1))
+        done
+        IFS="$old_ifs"
+    fi
+
+    printf '{\n'
+    printf '  "pwm": %s,\n'                  "$pwm"
+    printf '  "pwm_max": %s,\n'              "$pwm_max"
+    printf '  "pwm_pct": %s,\n'              "$pwm_pct"
+    printf '  "cooling_level": %s,\n'        "$cooling_level"
+    printf '  "cooling_levels_total": %s,\n' "$cooling_levels_total"
+    printf '  "configured_levels": "%s",\n'  "$configured_levels"
+    printf '  "state": "%s"\n'               "$fan_state"
+    printf '}'
+}
+
 dtb_state_clear() {
     state_dir=$(_dtb_state_dir)
     rm -f "${state_dir}/state"

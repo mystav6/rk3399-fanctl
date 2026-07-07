@@ -34,7 +34,7 @@ COMMANDS:
     --restore           Restore original DTB from backup
     --verify            Verify DTB matches saved state
     --reapply           Re-apply saved cooling-levels (after kernel update)
-    --calibrate         (v1.1) Automatic minimum PWM calibration
+    --export-json       Output fan status as JSON (for monitoring integration)
     --monitor           (v1.2) Live temperature/PWM monitoring
     --version           Show version
     --help              Show this help
@@ -150,7 +150,11 @@ cmd_verify() {
     dtb_verify "$dtb_path" "$saved"
 }
 
-cmd_reapply() {
+cmd_export_json() {
+    fan_export_json
+    printf '\n'
+}
+
     require_root
 
     saved=$(dtb_state_load) || {
@@ -186,6 +190,7 @@ main() {
         --restore)   cmd_restore ;;
         --verify)    cmd_verify ;;
         --reapply)   cmd_reapply ;;
+        --export-json) cmd_export_json ;;
         --calibrate)
             log_error "--calibrate is planned for v1.1, not yet implemented."
             exit "$EXIT_INVALID_ARGS"
