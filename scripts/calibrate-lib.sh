@@ -92,9 +92,6 @@ fan_calibrate() {
     printf 'Press Enter to start, or Ctrl+C to cancel... ' >&2
     read -r _dummy <&2 || return 1
 
-    # Save current state
-    orig_enable=$(_pwm_enable_get 2>/dev/null || echo 1)
-
     # Restore on any exit
     trap '_calibrate_restore' EXIT INT TERM
 
