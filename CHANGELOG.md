@@ -4,26 +4,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
-## [0.5.2] - 2026-07-07
-
-### Added
-- `docs/installation.md` document - Installation document
-
-### Notes
-- Reupload of bad commit, added installation manual
-
-## [0.5.0] - 2026-07-07
-
-### Added
-- `--calibrate` command - interactive PWM fan calibration
-- `scripts/calibrate-lib.sh` - calibration library
-- `tests/test-calibrate.sh` - unit tests for calibration logic
-
-### Notes
-- Calibration tested on NanoPC-T4: minimum PWM=10, recommended=14
-- No tachometer support needed - user confirms fan state interactively
-- Safety margin of +4 PWM added to detected minimum
-
 ## [0.3.0] - 2026-07-01
 
 ### Added
