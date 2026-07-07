@@ -155,6 +155,7 @@ cmd_export_json() {
     printf '\n'
 }
 
+cmd_reapply() {
     require_root
 
     saved=$(dtb_state_load) || {

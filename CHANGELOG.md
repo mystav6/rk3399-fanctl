@@ -4,6 +4,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-07
+
+### Added
+- `--export-json` command for monitoring integration
+- `fan_export_json()` in dtb-lib.sh reads live PWM from sysfs
+- Flask API endpoints for Pi5 (`integration/api-fan-endpoints.py`)
+- Fan Control dashboard card (`integration/dashboard-fan-card.html`)
+- Updated status-export.sh for T4-1 (`integration/t4-1-status-export.sh`)
+
+### Fixed
+- Missing `cmd_reapply()` function header
+
 ## [0.3.0] - 2026-07-01
 
 ### Added
