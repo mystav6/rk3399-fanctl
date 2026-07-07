@@ -14,8 +14,10 @@ fi
 . "${LIB_DIR}/common.sh"
 # shellcheck source=scripts/dtb-lib.sh
 . "${LIB_DIR}/dtb-lib.sh"
+# shellcheck source=scripts/calibrate-lib.sh
+. "${LIB_DIR}/calibrate-lib.sh"
 
-VERSION="0.4.0"
+VERSION="0.3.0"
 
 # Flag for kernel hook - skip saving state (state is already saved)
 NO_STATE_UPDATE=0
@@ -35,6 +37,7 @@ COMMANDS:
     --verify            Verify DTB matches saved state
     --reapply           Re-apply saved cooling-levels (after kernel update)
     --export-json       Output fan status as JSON (for monitoring integration)
+    --calibrate         Find minimum PWM at which fan reliably starts
     --monitor           (v1.2) Live temperature/PWM monitoring
     --version           Show version
     --help              Show this help
@@ -193,8 +196,19 @@ main() {
         --reapply)   cmd_reapply ;;
         --export-json) cmd_export_json ;;
         --calibrate)
-            log_error "--calibrate is planned for v1.1, not yet implemented."
-            exit "$EXIT_INVALID_ARGS"
+            require_root
+            # fan_calibrate writes recommended levels to a temp file
+            # We cannot use $() because it would block interactive stdin/stderr
+            _cal_tmp=$(mktemp /tmp/rk3399-fanctl-cal.XXXXXX)
+            if fan_calibrate > "$_cal_tmp"; then
+                _cal_levels=$(cat "$_cal_tmp")
+                rm -f "$_cal_tmp"
+                if [ -n "$_cal_levels" ]; then
+                    cmd_levels "$_cal_levels"
+                fi
+            else
+                rm -f "$_cal_tmp"
+            fi
             ;;
         --monitor)
             log_error "--monitor is planned for v1.2, not yet implemented."
