@@ -15,7 +15,7 @@ fi
 # shellcheck source=scripts/dtb-lib.sh
 . "${LIB_DIR}/dtb-lib.sh"
 
-VERSION="0.3.0"
+VERSION="0.4.0"
 
 # Flag for kernel hook - skip saving state (state is already saved)
 NO_STATE_UPDATE=0
