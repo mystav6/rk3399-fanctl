@@ -4,6 +4,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-07-07
+
+### Added
+- `--calibrate` interactive fan calibration command
+- `scripts/calibrate-lib.sh` calibration library
+- `tests/test-calibrate.sh` unit tests for calibration logic
+- `docs/installation.md` complete fresh installation guide
+
+### Fixed
+- SC1091 shellcheck directive for calibrate-lib.sh
+- SC2034 unused orig_enable variable removed
+- Duplicate shellcheck directive removed
+- Added -x flag to shellcheck in build.sh
+- Version bumped to 0.5.3 in Makefile and scripts
+
 ## [0.3.0] - 2026-07-01
 
 ### Added
