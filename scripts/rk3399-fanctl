@@ -15,9 +15,12 @@ fi
 # shellcheck source=scripts/dtb-lib.sh
 . "${LIB_DIR}/dtb-lib.sh"
 # shellcheck source=scripts/calibrate-lib.sh
+# shellcheck source=scripts/calibrate-lib.sh
 . "${LIB_DIR}/calibrate-lib.sh"
+# shellcheck source=scripts/monitor-lib.sh
+. "${LIB_DIR}/monitor-lib.sh"
 
-VERSION="0.3.0"
+VERSION="0.5.4"
 
 # Flag for kernel hook - skip saving state (state is already saved)
 NO_STATE_UPDATE=0
@@ -38,7 +41,8 @@ COMMANDS:
     --reapply           Re-apply saved cooling-levels (after kernel update)
     --export-json       Output fan status as JSON (for monitoring integration)
     --calibrate         Find minimum PWM at which fan reliably starts
-    --monitor           (v1.2) Live temperature/PWM monitoring
+    --monitor [N]       Live temperature/PWM dashboard (default: 5s refresh)
+    --monitor --interval N  Same with explicit interval
     --version           Show version
     --help              Show this help
 
@@ -211,8 +215,17 @@ main() {
             fi
             ;;
         --monitor)
-            log_error "--monitor is planned for v1.2, not yet implemented."
-            exit "$EXIT_INVALID_ARGS"
+            interval=5
+            # Check for --interval N argument
+            if [ $# -ge 3 ] && [ "$2" = "--interval" ]; then
+                interval="$3"
+            elif [ $# -ge 2 ] && [ "$2" != "--interval" ]; then
+                # Allow: --monitor 10 (shorthand)
+                case "$2" in
+                    [0-9]*) interval="$2" ;;
+                esac
+            fi
+            fan_monitor "$interval"
             ;;
         --version)
             printf 'rk3399-fanctl %s\n' "$VERSION"

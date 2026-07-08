@@ -1,9 +1,9 @@
 PROJECT  := rk3399-fanctl
-VERSION  := 0.5.3
+VERSION  := 0.5.4
 DIST_DIR := dist
 
 SCRIPTS := scripts/rk3399-fanctl scripts/common.sh scripts/dtb-lib.sh \
-           scripts/kernel-hook.sh scripts/calibrate-lib.sh
+           scripts/kernel-hook.sh scripts/calibrate-lib.sh scripts/monitor-lib.sh
 
 .PHONY: all lint test build clean install
 
@@ -31,7 +31,7 @@ clean:
 install:
 	install -d $(DESTDIR)/usr/share/rk3399-fanctl
 	install -m 0644 scripts/common.sh scripts/dtb-lib.sh \
-	                scripts/calibrate-lib.sh \
+	                scripts/calibrate-lib.sh scripts/monitor-lib.sh \
 	                $(DESTDIR)/usr/share/rk3399-fanctl/
 	install -d $(DESTDIR)/usr/sbin
 	install -m 0755 scripts/rk3399-fanctl $(DESTDIR)/usr/sbin/rk3399-fanctl

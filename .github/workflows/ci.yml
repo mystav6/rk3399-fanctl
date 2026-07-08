@@ -23,7 +23,8 @@ jobs:
             scripts/common.sh \
             scripts/dtb-lib.sh \
             scripts/kernel-hook.sh \
-            scripts/calibrate-lib.sh
+            scripts/calibrate-lib.sh \
+            scripts/monitor-lib.sh
 
   test:
     name: unit tests
