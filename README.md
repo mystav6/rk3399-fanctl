@@ -9,7 +9,7 @@ fail to start at low PWM values).
 
 ## Project status
 
-✅ v0.3.0 — tested on NanoPC-T4 with Armbian 26.8.x
+✅ v1.0.0 — Finished and tested on NanoPC-T4 with Armbian 26.8.x
 
 ## Features
 
@@ -21,8 +21,8 @@ rk3399-fanctl --backup
 rk3399-fanctl --restore
 rk3399-fanctl --verify
 rk3399-fanctl --reapply
-rk3399-fanctl --calibrate  (planned v1.1)
-rk3399-fanctl --monitor    (planned v1.2)
+rk3399-fanctl --calibrate 
+rk3399-fanctl --monitor   
 ```
 
 ## Supported boards
