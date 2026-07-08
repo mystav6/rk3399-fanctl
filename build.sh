@@ -22,11 +22,13 @@ echo ">> Sestavuji ${PROJECT} verze ${VERSION}"
 if [ "${SKIP_CHECKS:-0}" != "1" ]; then
     if command -v shellcheck >/dev/null 2>&1; then
         echo ">> shellcheck"
-        shellcheck -s sh \
+        shellcheck -s sh -x \
             scripts/rk3399-fanctl \
             scripts/common.sh \
             scripts/dtb-lib.sh \
-            scripts/kernel-hook.sh
+            scripts/kernel-hook.sh \
+            scripts/calibrate-lib.sh \
+            scripts/monitor-lib.sh
     else
         echo ">> shellcheck není nainstalován, přeskakuji"
     fi
