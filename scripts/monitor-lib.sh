@@ -146,15 +146,11 @@ _mon_init_colors() {
     if [ -t 1 ]; then
         COLOR_WARN="${COLOR_YELLOW:-$(printf '\033[33m')}"
         COLOR_MUTED="${COLOR_MUTED:-$(printf '\033[2m')}"
-        CURSOR_UP="$(printf '\033[%dA')"
-        CLEAR_LINE="$(printf '\033[2K')"
         CURSOR_HOME="$(printf '\033[H')"
         CLEAR_SCREEN="$(printf '\033[2J')"
     else
         COLOR_WARN=""
         COLOR_MUTED=""
-        CURSOR_UP=""
-        CLEAR_LINE=""
         CURSOR_HOME=""
         CLEAR_SCREEN=""
     fi
@@ -283,10 +279,6 @@ fan_monitor() {
     # Clear screen and render first frame
     printf '%s%s' "$CLEAR_SCREEN" "$CURSOR_HOME" >&2
     _mon_render "$interval"
-
-    # Count lines rendered so we can overwrite them each refresh
-    # Our dashboard is 13 lines tall (count from _mon_render)
-    DASHBOARD_LINES=13
 
     # Loop
     while true; do
