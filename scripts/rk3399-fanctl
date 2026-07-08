@@ -15,7 +15,6 @@ fi
 # shellcheck source=scripts/dtb-lib.sh
 . "${LIB_DIR}/dtb-lib.sh"
 # shellcheck source=scripts/calibrate-lib.sh
-# shellcheck source=scripts/calibrate-lib.sh
 . "${LIB_DIR}/calibrate-lib.sh"
 # shellcheck source=scripts/monitor-lib.sh
 . "${LIB_DIR}/monitor-lib.sh"
